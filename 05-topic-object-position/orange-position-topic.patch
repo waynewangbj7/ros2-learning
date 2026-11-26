@@ -1,0 +1,73 @@
+diff --git a/learning_topic/learning_topic/interface_object_pub.py b/learning_topic/learning_topic/interface_object_pub.py
+--- a/learning_topic/learning_topic/interface_object_pub.py
++++ b/learning_topic/learning_topic/interface_object_pub.py
+@@ -14,8 +14,8 @@
+ import numpy as np                                 # Python数值计算库
+ from learning_interface.msg import ObjectPosition  # 自定义的目标位置消息
+ 
+-lower_red = np.array([0, 90, 128])                 # 红色的HSV阈值下限
+-upper_red = np.array([180, 255, 255])              # 红色的HSV阈值上限
++lower_orange = np.array([10, 120, 80])
++upper_orange = np.array([25, 255, 255])
+ 
+ """
+ 创建一个订阅者节点
+@@ -32,12 +32,16 @@
+ 
+         self.objectX = 0
+         self.objectY = 0
++        self.position_updated = False
++        self.timer = self.create_timer(0.2, self.publish_position)
+ 
+     def object_detect(self, image):
+         hsv_img = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)        # 图像从BGR颜色模型转换为HSV模型
+-        mask_red = cv2.inRange(hsv_img, lower_red, upper_red)   # 图像二值化
+-        contours, hierarchy = cv2.findContours(
+-            mask_red, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)     # 图像中轮廓检测
++        self.objectX = 0
++        self.objectY = 0
++        mask_orange = cv2.inRange(hsv_img, lower_orange, upper_orange)
++        contours, hierarchy = cv2.findContours(
++            mask_orange, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
+         for cnt in contours:                                    # 去除一些轮廓面积太小的噪声
+             if cnt.shape[0] < 150:
+                 continue
+@@ -51,20 +55,29 @@
+             self.objectX = int(x+w/2)
+             self.objectY = int(y+h/2)
+ 
+-        cv2.imshow("object", image)                             # 使用OpenCV显示处理后的图像效果
+-        cv2.waitKey(50)
++        if (self.objectX, self.objectY) != (0, 0):
++            cv2.putText(image, f"x={self.objectX}  y={self.objectY}",
++                        (10, 25), cv2.FONT_HERSHEY_SIMPLEX,
++                        0.55, (0, 255, 0), 2)
++        cv2.imshow("object", image)                             # 使用OpenCV显示处理后的图像效果
++        cv2.waitKey(1)
+ 
+     def listener_callback(self, data):
+-        self.get_logger().info('Receiving video frame')         # 输出日志信息，提示已进入回调函数
+-        image = self.cv_bridge.imgmsg_to_cv2(data, 'bgr8')      # 将ROS的图像消息转化成OpenCV图像
+-        position = ObjectPosition()
+-        self.object_detect(image)                               # 苹果检测
+-        position.x, position.y = int(self.objectX), int(self.objectY)
+-        self.pub.publish(position)                              # 发布目标位置
++        image = self.cv_bridge.imgmsg_to_cv2(data, 'bgr8')
++        self.object_detect(image)
++        self.position_updated = True
++
++    def publish_position(self):
++        if not self.position_updated:
++            return
++        position = ObjectPosition()
++        position.x, position.y = self.objectX, self.objectY
++        self.pub.publish(position)
++        self.position_updated = False
+ 
+ def main(args=None):                                        # ROS2节点主入口main函数
+     rclpy.init(args=args)                                   # ROS2 Python接口初始化
+-    node = ImageSubscriber("topic_webcam_sub")              # 创建ROS2节点对象并进行初始化
++    node = ImageSubscriber("interface_object_pub")
+     rclpy.spin(node)                                        # 循环等待ROS2退出
+     node.destroy_node()                                     # 销毁节点对象
+     rclpy.shutdown()                                        # 关闭ROS2 Python接口

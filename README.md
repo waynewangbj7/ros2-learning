@@ -27,7 +27,8 @@ ros2-learning/
 ├─ 02-vision-red-detection/  摄像头接入 + HSV 红色区域识别（单节点）
 ├─ 03-dual-node-vision/      图像发布-订阅双节点 + 用 usb_cam 替换发布端
 ├─ 04-orange-service/        橙色识别 + ROS 2 服务返回像素坐标
-└─ 排错记录.md               三天的排查记录（累计）
+├─ 05-topic-object-position/ 同一份坐标改用话题持续发布（含补丁）
+└─ 排错记录.md               排查记录（累计）
 ```
 
 | 子项目 | 内容 | 涉及 ROS 2 机制 | 状态 |
@@ -36,6 +37,7 @@ ros2-learning/
 | [02-vision-red-detection](02-vision-red-detection/) | usbipd 接摄像头 + HSV 红色分割 | 单节点 + OpenCV | ✅ 定性通过 |
 | [03-dual-node-vision](03-dual-node-vision/) | 图像话题双节点，发布端换 `usb_cam` | **话题（发布+订阅）** | ✅ 两种发布端均通过 |
 | [04-orange-service](04-orange-service/) | 橙色检测 + 服务查询坐标 | **服务（请求+应答）** | ✅ 返回 `(214, 157)` |
+| [05-topic-object-position](05-topic-object-position/) | 同一份坐标改用话题持续发布 | **服务 → 话题的改造** | ⚠️ 话题通，叠字待恢复 |
 
 ---
 
@@ -49,15 +51,17 @@ ros2-learning/
 | 11-20 | 第一个 C++ 功能包与发布者节点 |
 | 11-22 | 接入真实摄像头，单节点 HSV 红色识别 |
 | 11-23 | 双节点图像链路；发布端换成 `usb_cam`；服务查询橙色目标坐标 |
+| 11-26 | 把坐标从「服务一问一答」改成「话题持续发布」，对比两种机制 |
 
 ---
 
-## 从这三个视觉实验里得到的结论
+## 从这几个实验里得到的结论
 
 1. **话题是解耦点**：识别端只依赖 `/image_raw`，换掉发布端（课程 OpenCV 节点 → `usb_cam`）后一行代码都不用改。
 2. **"有日志"不等于"有数据"**：发布端打印 `Publishing video frame` 可能写在取帧判断之外；判断有没有帧只能用 `ros2 topic echo`。
 3. **服务返回 `(0, 0)` 不等于没检测到**：只能说明服务应答了，要看画面和返回值是否同步更新。
 4. **编译通过 ≠ 能跑**：`colcon` 显示 `Finished` 也可能运行时抛 `IndentationError` / `NameError`，改完先 `py_compile`。
+5. **服务与话题各有场合**：同一份坐标，连续跟踪用话题（订阅后一直收），按需查询用服务（问一次答一次）。第 9 讲的客户端每运行一次只拿一个坐标，跟不上移动；改成话题后才持续流出。
 
 ---
 
